@@ -96,6 +96,11 @@ func TestLiteWindowStarts(t *testing.T) {
 					t.Error(err)
 					return
 				}
+				// GDI compatible bitmaps do not define alpha. Treat every pixel
+				// as opaque before PNG encoding, which would otherwise erase text.
+				for i := 3; i < len(image.Pix); i += 4 {
+					image.Pix[i] = 255
+				}
 				black, total, textPixels := 0, 0, 0
 				bounds := image.Bounds()
 				for y := 35; y < bounds.Dy()-8; y += 3 {
