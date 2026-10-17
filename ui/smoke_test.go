@@ -45,6 +45,11 @@ func TestLiteWindowStarts(t *testing.T) {
 	liveSample.Store(1)
 	go func() {
 		decoder, encoder := gob.NewDecoder(requestR), gob.NewEncoder(responseW)
+		encode := func(v any) {
+			if err := encoder.Encode(v); err != nil {
+				t.Errorf("fake manager could not encode %T: %v", v, err)
+			}
+		}
 		for {
 			var method manager.MethodType
 			if decoder.Decode(&method) != nil {
@@ -52,16 +57,16 @@ func TestLiteWindowStarts(t *testing.T) {
 			}
 			switch method {
 			case manager.TunnelsMethodType:
-				encoder.Encode([]manager.Tunnel{{Name: "Alpha"}, {Name: "Zulu"}})
-				encoder.Encode("")
+				encode([]manager.Tunnel{{Name: "Alpha"}, {Name: "Zulu"}})
+				encode("")
 			case manager.StateMethodType:
 				var name string
 				decoder.Decode(&name)
-				encoder.Encode(manager.TunnelStarted)
-				encoder.Encode("")
+				encode(manager.TunnelStarted)
+				encode("")
 			case manager.GlobalStateMethodType:
-				encoder.Encode(manager.TunnelStarted)
-				encoder.Encode("")
+				encode(manager.TunnelStarted)
+				encode("")
 			case manager.StoredConfigMethodType, manager.RuntimeConfigMethodType:
 				var name string
 				decoder.Decode(&name)
@@ -72,8 +77,8 @@ func TestLiteWindowStarts(t *testing.T) {
 				if method == manager.RuntimeConfigMethodType {
 					sample := liveSample.Load()
 					if sample == 3 {
-						encoder.Encode(conf.Config{})
-						encoder.Encode("runtime statistics temporarily unavailable")
+						encode(conf.Config{})
+						encode("runtime statistics temporarily unavailable")
 						continue
 					}
 					for i := range cfg.Peers {
@@ -86,14 +91,21 @@ func TestLiteWindowStarts(t *testing.T) {
 						cfg.Peers[i].LastHandshakeTime = conf.HandshakeTime(time.Now().Add(-5 * time.Second).UnixNano())
 					}
 				}
-				encoder.Encode(cfg)
-				encoder.Encode("")
+				encode(cfg)
+				encode("")
 			default:
 				return
 			}
 		}
 	}()
 	manager.InitializeIPCClient(responseR, requestW, eventsR)
+	initial, err := (&manager.Tunnel{Name: "Zulu"}).RuntimeConfig()
+	if err != nil {
+		t.Fatal("initial live RPC failed", err)
+	}
+	if len(initial.Peers) != 2 || initial.Peers[0].RxBytes != 512*1024 {
+		t.Fatalf("initial live RPC lost counters: %+v", initial.Peers)
+	}
 	IsAdmin = true
 	uiPreferences.LastTunnel = "Zulu"
 	window, err := NewManageTunnelsWindow()
