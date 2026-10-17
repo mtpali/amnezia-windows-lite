@@ -298,7 +298,9 @@ func (tv *ListView) SelectFirstActiveTunnel() {
 			}
 			if state == manager.TunnelStarting || state == manager.TunnelStarted {
 				tv.Synchronize(func() {
-					rememberConnectedTunnel(tunnel.Name)
+					if state == manager.TunnelStarted {
+						rememberConnectedTunnel(tunnel.Name)
+					}
 					tv.selectTunnel(tunnel.Name)
 				})
 				return

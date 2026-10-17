@@ -411,7 +411,7 @@ func (tp *TunnelsPage) onDelete() {
 		title = l18n.Sprintf("Delete tunnel ‘%s’", tunnelName)
 		question = l18n.Sprintf("Are you sure you would like to delete tunnel ‘%s’?", tunnelName)
 	}
-	if walk.DlgCmdNo == oledMessageBox(
+	if walk.DlgCmdYes != oledMessageBox(
 		tp.Form(),
 		title,
 		l18n.Sprintf("%s You cannot undo this action.", question),
