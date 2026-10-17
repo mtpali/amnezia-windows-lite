@@ -1,0 +1,28 @@
+module github.com/mtpali/amnezia-windows-lite
+
+go 1.25.0
+
+require (
+	github.com/lxn/walk v0.0.0-20210112085537-c389da54e794
+	github.com/lxn/win v0.0.0-20210218163916-a377121e959e
+	golang.org/x/sys v0.36.0
+	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2
+)
+
+require (
+	golang.org/x/crypto v0.42.0 // indirect
+	golang.org/x/text v0.29.0 // indirect
+)
+
+require (
+	github.com/amnezia-vpn/amneziawg-go/v3 v3.1.20260814
+	github.com/amnezia-vpn/amneziawg-windows/v3 v3.1.20260814
+	golang.org/x/net v0.44.0 // indirect
+)
+
+replace (
+	github.com/lxn/walk => golang.zx2c4.com/wireguard/windows v0.0.0-20210121140954-e7fc19d483bd
+	github.com/lxn/win => golang.zx2c4.com/wireguard/windows v0.0.0-20210224134948-620c54ef6199
+)
+
+replace github.com/amnezia-vpn/amneziawg-windows/v3 => ./third_party/awg-windows

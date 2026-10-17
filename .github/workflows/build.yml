@@ -1,0 +1,49 @@
+name: Portable Windows build
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test and build portable client
+        shell: pwsh
+        run: ./build.ps1 -Arch ${{ matrix.arch }} -RunTests
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-lite-${{ matrix.arch }}
+          path: |
+            dist/amnezia-windows-lite-${{ matrix.arch }}.zip
+            dist/SHA256-${{ matrix.arch }}.txt
+          retention-days: 30
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Publish portable downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BUILD_TAG: v0.1.${{ github.run_number }}
+          BUILD_SHA: ${{ github.sha }}
+        run: |
+          if gh release view "$BUILD_TAG" >/dev/null 2>&1; then
+            gh release upload "$BUILD_TAG" release/* --clobber
+          else
+            gh release create "$BUILD_TAG" release/* --target "$BUILD_SHA" --title "Windows Lite $BUILD_TAG" --notes-file PORTABLE.txt
+          fi

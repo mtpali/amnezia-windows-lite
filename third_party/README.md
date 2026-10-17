@@ -1,0 +1,1 @@
+The awg-windows directory is a source copy of github.com/amnezia-vpn/amneziawg-windows/v3 v3.1.20260814. Original copyright and license headers are retained. Local changes isolate service and registry names and make BlockUntunneledTraffic an explicit, default-off option. The protocol engine is retained. See ../COPYING and the original project links in the main README.
