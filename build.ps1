@@ -32,8 +32,14 @@ if ($RunTests) {
     if ($LASTEXITCODE -ne 0) { throw 'Preference tests failed' }
     & $go test . -run '^TestLite' -count=1
     if ($LASTEXITCODE -ne 0) { throw 'Configuration policy tests failed' }
-    & $go test ./ui/... -run '^TestLite' -count=1 -timeout 45s
-    if ($LASTEXITCODE -ne 0) { throw 'Editor tests failed' }
+    # UI package tests are a separate executable and need their own v6 common-controls manifest.
+    Copy-Item resources_windows_amd64.syso ui/resources_windows_amd64.syso
+    try {
+        & $go test ./ui/... -run '^TestLite' -count=1 -timeout 45s
+        if ($LASTEXITCODE -ne 0) { throw 'Editor tests failed' }
+    } finally {
+        Remove-Item ui/resources_windows_amd64.syso -ErrorAction SilentlyContinue
+    }
 }
 & $go run github.com/akavel/rsrc@v0.10.2 -arch $Arch -manifest manifest.xml -ico 'ui/icon/lite.ico,ui/icon/dot.ico' -o "resources_windows_$Arch.syso"
 if ($LASTEXITCODE -ne 0) { throw 'Resource generation failed' }
