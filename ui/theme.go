@@ -35,8 +35,8 @@ func initOLED() {
 		oledBrush, _ = walk.NewSolidColorBrush(oledBlack)
 		// ForceDark for native menus and common dialogs, available since 1903.
 		if windows.RtlGetVersion().BuildNumber >= 18362 {
-			if module, err := windows.LoadLibrary("uxtheme.dll"); err == nil {
-				defer windows.FreeLibrary(module)
+			if err := themeDLL.Load(); err == nil {
+				module := windows.Handle(themeDLL.Handle())
 				if proc, err := windows.GetProcAddressByOrdinal(module, 135); err == nil {
 					syscall.SyscallN(proc, 2)
 				}
@@ -99,6 +99,11 @@ func oledControlProc(hwnd win.HWND, msg uint32, wParam, lParam, id, data uintptr
 	switch msg {
 	case win.WM_ERASEBKGND:
 		return 1
+	case win.WM_PRINTCLIENT:
+		var rect win.RECT
+		win.GetClientRect(hwnd, &rect)
+		drawOLEDControl(hwnd, win.HDC(wParam), rect, oledControls[hwnd])
+		return 0
 	case win.WM_PAINT:
 		var ps win.PAINTSTRUCT
 		dc := win.BeginPaint(hwnd, &ps)

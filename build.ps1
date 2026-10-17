@@ -24,11 +24,15 @@ $env:CGO_ENABLED = '0'
 $env:GOOS = 'windows'
 $env:GOARCH = 'amd64'
 if ($RunTests) {
+    & $go run github.com/akavel/rsrc@v0.10.2 -arch amd64 -manifest manifest.xml -ico 'ui/icon/lite.ico,ui/icon/dot.ico' -o resources_windows_amd64.syso
+    if ($LASTEXITCODE -ne 0) { throw 'Test resource generation failed' }
+    $env:LITE_UI_SMOKE = '1'
+    $env:LITE_SCREENSHOT_DIR = Join-Path $PSScriptRoot 'dist/ui'
     & $go test ./internal/...
     if ($LASTEXITCODE -ne 0) { throw 'Preference tests failed' }
     & $go test . -run '^TestLite' -count=1
     if ($LASTEXITCODE -ne 0) { throw 'Configuration policy tests failed' }
-    & $go test ./ui/... -run '^TestLite' -count=1
+    & $go test ./ui/... -run '^TestLite' -count=1 -timeout 45s
     if ($LASTEXITCODE -ne 0) { throw 'Editor tests failed' }
 }
 & $go run github.com/akavel/rsrc@v0.10.2 -arch $Arch -manifest manifest.xml -ico 'ui/icon/lite.ico,ui/icon/dot.ico' -o "resources_windows_$Arch.syso"
