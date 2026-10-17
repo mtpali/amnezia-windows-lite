@@ -65,8 +65,8 @@ func TestLiteWindowStarts(t *testing.T) {
 				encode(manager.TunnelStarted)
 				encode("")
 			case manager.GlobalStateMethodType:
+				// GlobalState sends only the state, without an error frame.
 				encode(manager.TunnelStarted)
-				encode("")
 			case manager.StoredConfigMethodType, manager.RuntimeConfigMethodType:
 				var name string
 				decoder.Decode(&name)
