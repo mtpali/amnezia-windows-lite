@@ -74,6 +74,7 @@ func RunUI() {
 		win.ShowWindow(mtw.Handle(), win.SW_MINIMIZE)
 	}
 
+	mtw.Show()
 	mtw.Run()
 	if tray != nil {
 		tray.Dispose()
