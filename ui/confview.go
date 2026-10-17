@@ -36,6 +36,7 @@ func NewConfView(parent walk.Container) (*ConfView, error) {
 			return nil, err
 		}
 		(*field).SetTextColor(oledText)
+		(*field).SetMinMaxSize(walk.Size{0, 18}, walk.Size{0, 18})
 	}
 	font, err := walk.NewFont("Segoe UI", 13, walk.FontBold)
 	if err != nil {
@@ -44,6 +45,7 @@ func NewConfView(parent walk.Container) (*ConfView, error) {
 	}
 	cv.AddDisposable(font)
 	cv.title.SetFont(font)
+	cv.title.SetMinMaxSize(walk.Size{0, 24}, walk.Size{0, 24})
 	cv.status.SetTextColor(oledMuted)
 	cv.endpoint.SetTextColor(oledMuted)
 	cv.traffic.SetTextColor(oledMuted)

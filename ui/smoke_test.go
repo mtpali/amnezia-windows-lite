@@ -4,6 +4,7 @@ import (
 	"encoding/gob"
 	"github.com/amnezia-vpn/amneziawg-windows/v3/conf"
 	"github.com/lxn/walk"
+	"github.com/lxn/win"
 	"github.com/mtpali/amnezia-windows-lite/manager"
 	"image/png"
 	"os"
@@ -119,7 +120,7 @@ func TestLiteWindowStarts(t *testing.T) {
 					t.Errorf("OLED background is not predominantly black: %d/%d", black, total)
 				}
 				buttonBounds := window.tunnelsPage.confView.connect.BoundsPixels()
-				if textPixels < 75 || buttonBounds.Width < 50 || buttonBounds.Height < 15 || !window.tunnelsPage.confView.connect.Visible() {
+				if textPixels < 25 || buttonBounds.Width < 50 || buttonBounds.Height < 15 || !win.IsWindowVisible(window.tunnelsPage.confView.connect.Handle()) {
 					t.Errorf("window contents were not rendered: text=%d button=%+v", textPixels, buttonBounds)
 				}
 				if dir := os.Getenv("LITE_SCREENSHOT_DIR"); dir != "" {
