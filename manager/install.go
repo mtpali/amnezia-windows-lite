@@ -7,8 +7,8 @@ package manager
 
 import (
 	"errors"
-	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -85,7 +85,7 @@ func InstallManager() error {
 		ServiceType:  windows.SERVICE_WIN32_OWN_PROCESS,
 		StartType:    mgr.StartManual,
 		ErrorControl: mgr.ErrorNormal,
-		DisplayName:  "Windows Lite Manager",
+		DisplayName:  "amnezia Manager",
 	}
 
 	service, err = m.CreateService(serviceName, path, config, "/managerservice")
@@ -168,7 +168,7 @@ func InstallTunnel(configPath string) error {
 		StartType:    mgr.StartManual,
 		ErrorControl: mgr.ErrorNormal,
 		Dependencies: []string{"Nsi", "TcpIp"},
-		DisplayName:  "Windows Lite Tunnel: " + name,
+		DisplayName:  "amnezia Tunnel: " + name,
 		SidType:      windows.SERVICE_SID_TYPE_UNRESTRICTED,
 	}
 	service, err = m.CreateService(serviceName, path, config, "/tunnelservice", configPath)
@@ -203,44 +203,48 @@ func UninstallTunnel(name string) error {
 	return err2
 }
 
-func changeTunnelServiceConfigFilePath(name, oldPath, newPath string) {
-	var err error
-	defer func() {
-		if err != nil {
-			log.Printf("Unable to change tunnel service command line argument from %#q to %#q: %v", oldPath, newPath, err)
-		}
-	}()
+func changeTunnelServiceConfigFilePath(name, oldPath, newPath string) error {
 	m, err := serviceManager()
 	if err != nil {
-		return
+		return err
 	}
 	serviceName, err := services.ServiceNameOfTunnel(name)
 	if err != nil {
-		return
+		return err
 	}
 	service, err := m.OpenService(serviceName)
 	if err == windows.ERROR_SERVICE_DOES_NOT_EXIST {
-		err = nil
-		return
+		return nil
 	} else if err != nil {
-		return
+		return err
 	}
 	defer service.Close()
 	config, err := service.Config()
 	if err != nil {
-		return
+		return err
 	}
 	exePath, err := os.Executable()
 	if err != nil {
-		return
+		return err
 	}
 	args, err := windows.DecomposeCommandLine(config.BinaryPathName)
-	if err != nil || len(args) != 3 ||
-		!strings.EqualFold(args[0], exePath) || args[1] != "/tunnelservice" || !strings.EqualFold(args[2], oldPath) {
-		err = nil
-		return
+	if err != nil {
+		return err
+	}
+	if len(args) != 3 || args[1] != "/tunnelservice" {
+		return errors.New("Unexpected tunnel service command line")
+	}
+	if strings.EqualFold(args[2], newPath) {
+		return nil
+	}
+	// The previous portable release used WindowsLite.exe in the same folder.
+	sameExecutable := strings.EqualFold(args[0], exePath) ||
+		(strings.EqualFold(filepath.Base(args[0]), "WindowsLite.exe") &&
+			strings.EqualFold(filepath.Dir(args[0]), filepath.Dir(exePath)))
+	if !sameExecutable || !strings.EqualFold(args[2], oldPath) {
+		return errors.New("Tunnel service uses a different executable or configuration")
 	}
 	args[2] = newPath
 	config.BinaryPathName = windows.ComposeCommandLine(args)
-	err = service.UpdateConfig(config)
+	return service.UpdateConfig(config)
 }

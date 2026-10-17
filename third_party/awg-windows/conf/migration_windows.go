@@ -1,5 +1,4 @@
 /* SPDX-License-Identifier: MIT
- *
  * Copyright (C) 2019-2021 WireGuard LLC. All Rights Reserved.
  */
 
@@ -7,101 +6,65 @@ package conf
 
 import (
 	"errors"
-	"io"
-	"log"
+	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
-	"time"
-
-	"golang.org/x/sys/windows"
 )
 
 var migrating sync.Mutex
-var lastMigrationTimer *time.Timer
 
-type MigrationCallback func(name, oldPath, newPath string)
+type MigrationCallback func(name, oldPath, newPath string) error
 
-func MigrateUnencryptedConfigs(migrated MigrationCallback) { migrateUnencryptedConfigs(3, migrated) }
-
-func migrateUnencryptedConfigs(sharingBase int, migrated MigrationCallback) {
-	if migrated == nil {
-		migrated = func(_, _, _ string) {}
-	}
+// MigrateEncryptedConfigs upgrades legacy DPAPI files on the original Windows
+// installation. A conflicting or unreadable file is preserved. The encrypted
+// original is removed only after verifying the plaintext and updating any
+// installed tunnel service. Ordinary .conf files are never encrypted or removed.
+func MigrateEncryptedConfigs(migrated MigrationCallback) error {
 	migrating.Lock()
 	defer migrating.Unlock()
-	configFileDir, err := tunnelConfigurationsDirectory()
+	dir, err := tunnelConfigurationsDirectory()
 	if err != nil {
-		return
+		return err
 	}
-	files, err := os.ReadDir(configFileDir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
-		return
+		return err
 	}
-	ignoreSharingViolations := false
+	var failures []error
 	for _, file := range files {
-		path := filepath.Join(configFileDir, file.Name())
-		name := filepath.Base(file.Name())
-		if len(name) <= len(configFileUnencryptedSuffix) || !strings.HasSuffix(name, configFileUnencryptedSuffix) {
+		if !file.Type().IsRegular() || !PathIsEncrypted(file.Name()) {
 			continue
 		}
-		if !file.Type().IsRegular() {
-			continue
+		oldPath := filepath.Join(dir, file.Name())
+		if err := migrateEncryptedConfig(oldPath, dir, migrated); err != nil {
+			failures = append(failures, fmt.Errorf("migrate %s: %w", file.Name(), err))
 		}
-		info, err := file.Info()
-		if err != nil {
-			continue
-		}
-		if info.Mode().Perm()&0444 == 0 {
-			continue
-		}
-
-		var bytes []byte
-		var config *Config
-		var newPath string
-		// We don't use os.ReadFile, because we actually want RDWR, so that we can take advantage
-		// of Windows file locking for ensuring the file is finished being written.
-		f, err := os.OpenFile(path, os.O_RDWR, 0)
-		if err != nil {
-			if errors.Is(err, windows.ERROR_SHARING_VIOLATION) {
-				if ignoreSharingViolations {
-					continue
-				} else if sharingBase > 0 {
-					if lastMigrationTimer != nil {
-						lastMigrationTimer.Stop()
-					}
-					lastMigrationTimer = time.AfterFunc(time.Second/time.Duration(sharingBase*sharingBase), func() { migrateUnencryptedConfigs(sharingBase-1, migrated) })
-					ignoreSharingViolations = true
-					continue
-				}
-			}
-			goto error
-		}
-		bytes, err = io.ReadAll(f)
-		f.Close()
-		if err != nil {
-			goto error
-		}
-		config, err = FromWgQuickWithUnknownEncoding(string(bytes), strings.TrimSuffix(name, configFileUnencryptedSuffix))
-		if err != nil {
-			goto error
-		}
-		err = config.Save(false)
-		if err != nil {
-			goto error
-		}
-		err = os.Remove(path)
-		if err != nil {
-			goto error
-		}
-		newPath, err = config.Path()
-		if err != nil {
-			goto error
-		}
-		migrated(config.Name, path, newPath)
-		continue
-	error:
-		log.Printf("Unable to ingest and encrypt %#q: %v", path, err)
 	}
+	return errors.Join(failures...)
+}
+
+func migrateEncryptedConfig(oldPath, dir string, migrated MigrationCallback) error {
+	config, err := LoadFromPath(oldPath)
+	if err != nil {
+		return err
+	}
+	newPath := filepath.Join(dir, config.Name+configFileSuffix)
+	if err := config.Save(false); err != nil && !os.IsExist(err) {
+		return err
+	}
+	// Also handles an interrupted migration that already wrote the .conf file.
+	stored, err := LoadFromPath(newPath)
+	if err != nil {
+		return err
+	}
+	if stored.ToWgQuick() != config.ToWgQuick() {
+		return errors.New("a different plaintext configuration already exists")
+	}
+	if migrated != nil {
+		if err := migrated(config.Name, oldPath, newPath); err != nil {
+			return err
+		}
+	}
+	return os.Remove(oldPath)
 }

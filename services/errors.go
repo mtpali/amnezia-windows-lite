@@ -15,7 +15,7 @@ type Error uint32
 
 const (
 	ErrorSuccess Error = iota
-	ErrorRingloggerOpen
+	_                  // Reserved to preserve service exit-code compatibility.
 	ErrorLoadConfiguration
 	ErrorCreateNetworkAdapter
 	ErrorDNSLookup
@@ -37,8 +37,6 @@ func (e Error) Error() string {
 	switch e {
 	case ErrorSuccess:
 		return "No error"
-	case ErrorRingloggerOpen:
-		return "Unable to open log file"
 	case ErrorDetermineExecutablePath:
 		return "Unable to determine path of running executable"
 	case ErrorLoadConfiguration:

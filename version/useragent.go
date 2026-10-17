@@ -22,5 +22,5 @@ func Arch() string {
 }
 
 func UserAgent() string {
-	return fmt.Sprintf("Windows Lite/%s (%s; %s)", Number, OsName(), Arch())
+	return fmt.Sprintf("amnezia/%s (%s; %s)", Number, OsName(), Arch())
 }

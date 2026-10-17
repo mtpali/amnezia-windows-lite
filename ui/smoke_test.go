@@ -77,6 +77,9 @@ func TestLiteWindowStarts(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer window.Dispose()
+	if window.Title() != "amnezia" {
+		t.Fatalf("unexpected application title: %q", window.Title())
+	}
 	if selected := window.tunnelsPage.listView.CurrentTunnel(); selected == nil || selected.Name != "Zulu" {
 		t.Fatal("native list did not restore the last connection")
 	}
@@ -86,6 +89,20 @@ func TestLiteWindowStarts(t *testing.T) {
 			window.Synchronize(func() {
 				defer walk.App().Exit(0)
 				rendered = true
+				checkPlacement := func() {
+					work, ok := windowWorkArea(window.Handle(), false)
+					bounds := window.BoundsPixels()
+					if !ok || bounds.X+bounds.Width != int(work.Right) || bounds.Y+bounds.Height != int(work.Bottom) {
+						t.Errorf("window is not at bottom right above the taskbar: bounds=%+v work=%+v", bounds, work)
+					}
+				}
+				checkPlacement()
+				// Reopening from the tray must restore the anchor even if the
+				// window was previously dragged somewhere else.
+				window.Hide()
+				win.SetWindowPos(window.Handle(), 0, 20, 20, 0, 0, win.SWP_NOSIZE|win.SWP_NOZORDER|win.SWP_NOACTIVATE)
+				window.ShowAtBottomRight()
+				checkPlacement()
 				bitmap, err := walk.NewBitmapFromWindow(window)
 				if err != nil {
 					t.Error(err)
@@ -128,7 +145,7 @@ func TestLiteWindowStarts(t *testing.T) {
 						t.Error(err)
 						return
 					}
-					f, err := os.Create(filepath.Join(dir, "windows-lite.png"))
+					f, err := os.Create(filepath.Join(dir, "amnezia.png"))
 					if err != nil {
 						t.Error(err)
 						return
@@ -141,7 +158,7 @@ func TestLiteWindowStarts(t *testing.T) {
 			})
 		})
 	})
-	window.Show()
+	window.ShowAtBottomRight()
 	window.Run()
 	if !rendered {
 		t.Fatal("window did not run its message loop")

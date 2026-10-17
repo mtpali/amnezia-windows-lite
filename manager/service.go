@@ -9,7 +9,6 @@ import (
 	"errors"
 	"log"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"sync"
@@ -22,7 +21,6 @@ import (
 	"github.com/amnezia-vpn/amneziawg-windows/v3/conf"
 	"github.com/mtpali/amnezia-windows-lite/elevate"
 	"github.com/mtpali/amnezia-windows-lite/portable"
-	"github.com/mtpali/amnezia-windows-lite/ringlogger"
 	"github.com/mtpali/amnezia-windows-lite/services"
 )
 
@@ -43,20 +41,6 @@ func (service *managerService) Execute(args []string, r <-chan svc.ChangeRequest
 		changes <- svc.Status{State: svc.StopPending}
 	}()
 
-	var logFile string
-	logFile, err = LogFile(true)
-	if err != nil {
-		serviceError = services.ErrorRingloggerOpen
-		return
-	}
-	err = ringlogger.InitGlobalLogger(logFile, "MGR")
-	if err != nil {
-		serviceError = services.ErrorRingloggerOpen
-		return
-	}
-
-	services.PrintStarting()
-
 	path, err := os.Executable()
 	if err != nil {
 		serviceError = services.ErrorDetermineExecutablePath
@@ -69,7 +53,7 @@ func (service *managerService) Execute(args []string, r <-chan svc.ChangeRequest
 		return
 	}
 
-	conf.RegisterStoreChangeCallback(func() { conf.MigrateUnencryptedConfigs(changeTunnelServiceConfigFilePath) })
+	conf.RegisterStoreChangeCallback(func() { _ = conf.MigrateEncryptedConfigs(changeTunnelServiceConfigFilePath) })
 	conf.RegisterStoreChangeCallback(IPCServerNotifyTunnelsChange)
 
 	procs := make(map[uint32]*uiProcess)
@@ -187,12 +171,6 @@ func (service *managerService) Execute(args []string, r <-chan svc.ChangeRequest
 				return
 			}
 			IPCServerListen(ourReader, ourWriter, ourEvents, elevatedToken)
-			theirLogMapping, err := ringlogger.Global.ExportInheritableMappingHandle()
-			if err != nil {
-				log.Printf("Unable to export inheritable mapping handle for logging: %v", err)
-				return
-			}
-
 			log.Printf("Starting UI process for user ‘%s@%s’ for session %d", username, domain, session)
 			procsLock.Lock()
 			var proc *uiProcess
@@ -203,12 +181,10 @@ func (service *managerService) Execute(args []string, r <-chan svc.ChangeRequest
 					strconv.FormatUint(uint64(theirReader.Fd()), 10),
 					strconv.FormatUint(uint64(theirWriter.Fd()), 10),
 					strconv.FormatUint(uint64(theirEvents.Fd()), 10),
-					strconv.FormatUint(uint64(theirLogMapping), 10),
 				}, userProfileDirectory, []windows.Handle{
 					windows.Handle(theirReader.Fd()),
 					windows.Handle(theirWriter.Fd()),
 					windows.Handle(theirEvents.Fd()),
-					theirLogMapping,
 				}, runToken)
 			} else {
 				err = errors.New("Session has logged out")
@@ -217,7 +193,6 @@ func (service *managerService) Execute(args []string, r <-chan svc.ChangeRequest
 			theirReader.Close()
 			theirWriter.Close()
 			theirEvents.Close()
-			windows.CloseHandle(theirLogMapping)
 			if err != nil {
 				ourReader.Close()
 				ourWriter.Close()
@@ -353,12 +328,4 @@ func Run() error {
 		return err
 	}
 	return svc.Run("WindowsLiteManager", &managerService{})
-}
-
-func LogFile(createRoot bool) (string, error) {
-	root, err := conf.RootDirectory(createRoot)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(root, "log.bin"), nil
 }

@@ -24,29 +24,12 @@ import (
 	"github.com/mtpali/amnezia-windows-lite/l18n"
 	"github.com/mtpali/amnezia-windows-lite/manager"
 	"github.com/mtpali/amnezia-windows-lite/portable"
-	"github.com/mtpali/amnezia-windows-lite/ringlogger"
 	"github.com/mtpali/amnezia-windows-lite/ui"
 )
 
-func setLogFile() {
-	logHandle, err := windows.GetStdHandle(windows.STD_ERROR_HANDLE)
-	if logHandle == 0 || err != nil {
-		logHandle, err = windows.GetStdHandle(windows.STD_OUTPUT_HANDLE)
-	}
-	if logHandle == 0 || err != nil {
-		log.SetOutput(io.Discard)
-	} else {
-		log.SetOutput(os.NewFile(uintptr(logHandle), "stderr"))
-	}
-}
-
 func fatal(v ...any) {
-	if log.Writer() == io.Discard {
-		windows.MessageBox(0, windows.StringToUTF16Ptr(fmt.Sprint(v...)), windows.StringToUTF16Ptr(l18n.Sprintf("Error")), windows.MB_ICONERROR)
-		os.Exit(1)
-	} else {
-		log.Fatal(append([]any{l18n.Sprintf("Error: ")}, v...))
-	}
+	windows.MessageBox(0, windows.StringToUTF16Ptr(fmt.Sprint(v...)), windows.StringToUTF16Ptr(l18n.Sprintf("Error")), windows.MB_ICONERROR)
+	os.Exit(1)
 }
 
 func fatalf(format string, v ...any) {
@@ -54,11 +37,7 @@ func fatalf(format string, v ...any) {
 }
 
 func info(title, format string, v ...any) {
-	if log.Writer() == io.Discard {
-		windows.MessageBox(0, windows.StringToUTF16Ptr(l18n.Sprintf(format, v...)), windows.StringToUTF16Ptr(title), windows.MB_ICONINFORMATION)
-	} else {
-		log.Printf(title+":\n"+format, v...)
-	}
+	windows.MessageBox(0, windows.StringToUTF16Ptr(l18n.Sprintf(format, v...)), windows.StringToUTF16Ptr(title), windows.MB_ICONINFORMATION)
 }
 
 func usage() {
@@ -70,8 +49,7 @@ func usage() {
 		"/uninstalltunnelservice TUNNEL_NAME",
 		"/managerservice",
 		"/tunnelservice CONFIG_PATH",
-		"/ui CMD_READ_HANDLE CMD_WRITE_HANDLE CMD_EVENT_HANDLE LOG_MAPPING_HANDLE",
-		"/dumplog [/tail]",
+		"/ui CMD_READ_HANDLE CMD_WRITE_HANDLE CMD_EVENT_HANDLE",
 	}
 	builder := strings.Builder{}
 	for _, flag := range flags {
@@ -102,7 +80,7 @@ func checkForWow64() {
 		fatalf("Unable to determine whether the process is running under WOW64: %v", err)
 	}
 	if b {
-		fatalf("You must use the native version of Windows Lite on this computer.")
+		fatalf("You must use the native version of amnezia on this computer.")
 	}
 }
 
@@ -115,14 +93,14 @@ func checkForAdminGroup() {
 	}
 	defer processToken.Close()
 	if !elevate.TokenIsElevatedOrElevatable(processToken) {
-		fatalf("Windows Lite may only be used by users who are a member of the Builtin %s group.", elevate.AdminGroupName())
+		fatalf("amnezia may only be used by users who are a member of the Builtin %s group.", elevate.AdminGroupName())
 	}
 }
 
 func checkForAdminDesktop() {
 	adminDesktop, err := elevate.IsAdminDesktop()
 	if !adminDesktop && err == nil {
-		fatalf("Windows Lite is running, but the UI is only accessible from desktops of the Builtin %s group.", elevate.AdminGroupName())
+		fatalf("amnezia is running, but the UI is only accessible from desktops of the Builtin %s group.", elevate.AdminGroupName())
 	}
 }
 
@@ -148,6 +126,9 @@ func pipeFromHandleArgument(handleStr string) (*os.File, error) {
 }
 
 func main() {
+	// Dependencies may emit diagnostic messages; this client has no log output,
+	// shared log mapping, or persistent log files. Errors still reach the UI.
+	log.SetOutput(io.Discard)
 	if windows.SetDllDirectory("") != nil || windows.SetDefaultDllDirectories(windows.LOAD_LIBRARY_SEARCH_SYSTEM32) != nil {
 		panic("failed to restrict dll search path")
 	}
@@ -155,7 +136,6 @@ func main() {
 	if err := portable.Configure(); err != nil {
 		fatal(err)
 	}
-	setLogFile()
 	checkForWow64()
 
 	if len(os.Args) <= 1 {
@@ -184,7 +164,7 @@ func main() {
 		}
 		checkForAdminDesktop()
 		time.Sleep(30 * time.Second)
-		fatalf("Windows Lite system tray icon did not appear after 30 seconds.")
+		fatalf("amnezia system tray icon did not appear after 30 seconds.")
 		return
 	case "/uninstallmanagerservice":
 		if len(os.Args) != 2 {
@@ -232,7 +212,7 @@ func main() {
 		}
 		return
 	case "/ui":
-		if len(os.Args) != 6 {
+		if len(os.Args) != 5 {
 			usage()
 		}
 		var processToken windows.Token
@@ -260,35 +240,9 @@ func main() {
 		if err != nil {
 			fatal(err)
 		}
-		ringlogger.Global, err = ringlogger.NewRingloggerFromInheritedMappingHandle(os.Args[5], "GUI")
-		if err != nil {
-			fatal(err)
-		}
 		manager.InitializeIPCClient(readPipe, writePipe, eventPipe)
 		ui.IsAdmin = isAdmin
 		ui.RunUI()
-		return
-	case "/dumplog":
-		if len(os.Args) != 2 && len(os.Args) != 3 {
-			usage()
-		}
-		outputHandle, err := windows.GetStdHandle(windows.STD_OUTPUT_HANDLE)
-		if err != nil {
-			fatal(err)
-		}
-		if outputHandle == 0 {
-			fatal("Stdout must be set")
-		}
-		file := os.NewFile(uintptr(outputHandle), "stdout")
-		defer file.Close()
-		logPath, err := manager.LogFile(false)
-		if err != nil {
-			fatal(err)
-		}
-		err = ringlogger.DumpTo(logPath, file, len(os.Args) == 3 && os.Args[2] == "/tail")
-		if err != nil {
-			fatal(err)
-		}
 		return
 	}
 	usage()

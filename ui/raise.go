@@ -67,7 +67,7 @@ func WaitForRaiseUIThenQuit() {
 		return 0
 	}, 0, 0, win.WINEVENT_SKIPOWNPROCESS|win.WINEVENT_OUTOFCONTEXT)
 	if err != nil {
-		showErrorCustom(nil, l18n.Sprintf("Windows Lite Detection Error"), l18n.Sprintf("Unable to wait for Windows Lite window to appear: %v", err))
+		showErrorCustom(nil, l18n.Sprintf("amnezia Detection Error"), l18n.Sprintf("Unable to wait for amnezia window to appear: %v", err))
 	}
 	for {
 		var msg win.MSG

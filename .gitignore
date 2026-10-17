@@ -21,7 +21,7 @@
 /dist
 /Data
 /State
-!ui/icon/lite.ico
+!ui/icon/amnezia.ico
 !ui/icon/dot.ico
 
 *.exe

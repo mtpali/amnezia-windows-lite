@@ -1,16 +1,20 @@
-WINDOWS LITE
+AMNEZIA
 
-Extract the ZIP to a local folder and run WindowsLite.exe. Accept the Administrator prompt. Keep wintun.dll next to the EXE. No MSI or setup is needed.
+Extract the ZIP to a local folder and run amnezia.exe. Accept the Administrator prompt. Keep wintun.dll next to the EXE. No MSI or setup is needed.
 
 Import .conf files or a configuration ZIP, select a configuration and click Connect. Double-click a configuration to connect/disconnect. The last successful connection is remembered. It is selected next time; it is not automatically connected.
 
+For an upgrade from Windows Lite, use Exit in the old tray menu before replacing files. Keep Data and State in the same folder.
+
 Close hides the window to the tray. Use Exit in the tray menu to disconnect tunnels and remove the temporary WindowsLite services. Exit before moving or deleting the application folder. Services are demand-start and do not start at boot.
 
-Data contains SYSTEM-encrypted configuration files. State contains the remembered selection. Both stay next to the EXE. Configurations use Windows DPAPI, so export them before transferring them to a different Windows installation. Exported configuration ZIPs include private keys.
+Data/Configurations contains readable .conf files; no new configurations are encrypted or obfuscated. State contains the remembered selection. Both stay next to the EXE. Stored .conf files and exported configuration ZIPs include private keys. Windows directory permissions remain in place; editing stored files may require administrator access.
+
+Legacy .conf.dpapi files are converted automatically on the original Windows installation. The encrypted original is removed only after verifying the plaintext and updating any installed tunnel service. Conflicting or unreadable legacy files are preserved. Run the upgrade on the original Windows installation before moving an old encrypted configuration folder to a different computer.
 
 Block untunneled traffic is OFF for standard imported configurations, including 0.0.0.0/0 and ::/0 routes. Routing stays unchanged. It can be enabled explicitly in Edit. This local option is stored as BlockUntunneledTraffic = on and is not sent to the protocol engine. Remove that line when exporting an opted-in configuration to another client.
 
-The interface is OLED black only. The About page, promotional text and upstream updater have been removed. Logs are available on demand. Native file pickers use Windows common dialogs.
+The interface is OLED black only. The main window opens at the bottom right of the display work area, above the taskbar; reopening it from the tray restores that position. The About page, promotional text and upstream updater have been removed. The Log screen, log export and persistent log capture have been removed. Native file pickers use Windows common dialogs.
 
 amd64: Windows 10/11 x64. arm64: Windows 11 ARM64. Windows 7 is not supported.
 

@@ -74,7 +74,7 @@ func RunUI() {
 		win.ShowWindow(mtw.Handle(), win.SW_MINIMIZE)
 	}
 
-	mtw.Show()
+	mtw.ShowAtBottomRight()
 	mtw.Run()
 	if tray != nil {
 		tray.Dispose()
@@ -84,7 +84,7 @@ func RunUI() {
 	if shouldQuitManagerWhenExiting {
 		_, err := manager.IPCClientQuit(true)
 		if err != nil {
-			showErrorCustom(nil, l18n.Sprintf("Error Exiting Windows Lite"), l18n.Sprintf("Unable to exit service due to: %v. You may want to stop Windows Lite from the service manager.", err))
+			showErrorCustom(nil, l18n.Sprintf("Error Exiting amnezia"), l18n.Sprintf("Unable to exit service due to: %v. You may want to stop amnezia from the service manager.", err))
 		}
 	}
 }

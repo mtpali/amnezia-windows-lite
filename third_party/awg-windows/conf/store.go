@@ -14,8 +14,8 @@ import (
 	"github.com/amnezia-vpn/amneziawg-windows/v3/conf/dpapi"
 )
 
-const configFileSuffix = ".conf.dpapi"
-const configFileUnencryptedSuffix = ".conf"
+const configFileSuffix = ".conf"
+const configFileEncryptedSuffix = ".conf.dpapi"
 
 func ListConfigNames() ([]string, error) {
 	configFileDir, err := tunnelConfigurationsDirectory()
@@ -26,11 +26,12 @@ func ListConfigNames() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	configs := make([]string, len(files))
-	i := 0
+	configs := make([]string, 0, len(files))
+	seen := make(map[string]bool)
 	for _, file := range files {
 		name := filepath.Base(file.Name())
-		if len(name) <= len(configFileSuffix) || !strings.HasSuffix(name, configFileSuffix) {
+		name, err = NameFromPath(name)
+		if err != nil {
 			continue
 		}
 		if !file.Type().IsRegular() {
@@ -43,22 +44,21 @@ func ListConfigNames() ([]string, error) {
 		if info.Mode().Perm()&0444 == 0 {
 			continue
 		}
-		name = strings.TrimSuffix(name, configFileSuffix)
-		if !TunnelNameIsValid(name) {
-			continue
+		key := strings.ToLower(name)
+		if !seen[key] {
+			configs = append(configs, name)
+			seen[key] = true
 		}
-		configs[i] = name
-		i++
 	}
-	return configs[:i], nil
+	return configs, nil
 }
 
 func LoadFromName(name string) (*Config, error) {
-	configFileDir, err := tunnelConfigurationsDirectory()
+	path, err := (&Config{Name: name}).Path()
 	if err != nil {
 		return nil, err
 	}
-	return LoadFromPath(filepath.Join(configFileDir, name+configFileSuffix))
+	return LoadFromPath(path)
 }
 
 func LoadFromPath(path string) (*Config, error) {
@@ -70,7 +70,7 @@ func LoadFromPath(path string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	if strings.HasSuffix(path, configFileSuffix) {
+	if PathIsEncrypted(path) {
 		bytes, err = dpapi.Decrypt(bytes, name)
 		if err != nil {
 			return nil, err
@@ -80,19 +80,18 @@ func LoadFromPath(path string) (*Config, error) {
 }
 
 func PathIsEncrypted(path string) bool {
-	return strings.HasSuffix(filepath.Base(path), configFileSuffix)
+	return strings.HasSuffix(filepath.Base(path), configFileEncryptedSuffix)
 }
 
 func NameFromPath(path string) (string, error) {
 	name := filepath.Base(path)
-	if !((len(name) > len(configFileSuffix) && strings.HasSuffix(name, configFileSuffix)) ||
-		(len(name) > len(configFileUnencryptedSuffix) && strings.HasSuffix(name, configFileUnencryptedSuffix))) {
-		return "", errors.New("Path must end in either " + configFileSuffix + " or " + configFileUnencryptedSuffix)
-	}
-	if strings.HasSuffix(path, configFileSuffix) {
+	switch {
+	case strings.HasSuffix(name, configFileEncryptedSuffix):
+		name = strings.TrimSuffix(name, configFileEncryptedSuffix)
+	case strings.HasSuffix(name, configFileSuffix):
 		name = strings.TrimSuffix(name, configFileSuffix)
-	} else {
-		name = strings.TrimSuffix(name, configFileUnencryptedSuffix)
+	default:
+		return "", errors.New("Path must end in either " + configFileSuffix + " or " + configFileEncryptedSuffix)
 	}
 	if !TunnelNameIsValid(name) {
 		return "", errors.New("Tunnel name is not valid")
@@ -110,11 +109,7 @@ func (config *Config) Save(overwrite bool) error {
 	}
 	filename := filepath.Join(configFileDir, config.Name+configFileSuffix)
 	bytes := []byte(config.ToWgQuick())
-	bytes, err = dpapi.Encrypt(bytes, config.Name)
-	if err != nil {
-		return err
-	}
-	return writeLockedDownFile(filename, overwrite, bytes)
+	return writeConfigFile(filename, overwrite, bytes)
 }
 
 func (config *Config) Path() (string, error) {
@@ -125,7 +120,14 @@ func (config *Config) Path() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(configFileDir, config.Name+configFileSuffix), nil
+	path := filepath.Join(configFileDir, config.Name+configFileSuffix)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		legacyPath := filepath.Join(configFileDir, config.Name+configFileEncryptedSuffix)
+		if _, legacyErr := os.Stat(legacyPath); legacyErr == nil {
+			return legacyPath, nil
+		}
+	}
+	return path, nil
 }
 
 func DeleteName(name string) error {
@@ -136,7 +138,19 @@ func DeleteName(name string) error {
 	if err != nil {
 		return err
 	}
-	return os.Remove(filepath.Join(configFileDir, name+configFileSuffix))
+	var removed bool
+	for _, suffix := range []string{configFileSuffix, configFileEncryptedSuffix} {
+		err := os.Remove(filepath.Join(configFileDir, name+suffix))
+		if err == nil {
+			removed = true
+		} else if !os.IsNotExist(err) {
+			return err
+		}
+	}
+	if !removed {
+		return os.ErrNotExist
+	}
+	return nil
 }
 
 func (config *Config) Delete() error {

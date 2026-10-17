@@ -9,13 +9,10 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"path/filepath"
-	"sync/atomic"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
-
-var encryptedFileSd unsafe.Pointer
 
 func randomFileName() string {
 	var randBytes [32]byte
@@ -26,17 +23,9 @@ func randomFileName() string {
 	return hex.EncodeToString(randBytes[:]) + ".tmp"
 }
 
-func writeLockedDownFile(destination string, overwrite bool, contents []byte) error {
-	var err error
-	sa := &windows.SecurityAttributes{Length: uint32(unsafe.Sizeof(windows.SecurityAttributes{}))}
-	sa.SecurityDescriptor = (*windows.SECURITY_DESCRIPTOR)(atomic.LoadPointer(&encryptedFileSd))
-	if sa.SecurityDescriptor == nil {
-		sa.SecurityDescriptor, err = windows.SecurityDescriptorFromString("O:SYG:SYD:PAI(A;;FA;;;SY)(A;;SD;;;BA)")
-		if err != nil {
-			return err
-		}
-		atomic.StorePointer(&encryptedFileSd, unsafe.Pointer(sa.SecurityDescriptor))
-	}
+func writeConfigFile(destination string, overwrite bool, contents []byte) error {
+	// Inherit the configuration directory's normal permissions. The manager
+	// keeps Data protected, while files remain readable by administrators.
 	destination16, err := windows.UTF16FromString(destination)
 	if err != nil {
 		return err
@@ -46,7 +35,7 @@ func writeLockedDownFile(destination string, overwrite bool, contents []byte) er
 	if err != nil {
 		return err
 	}
-	handle, err := windows.CreateFile(tmpDestination16, windows.GENERIC_WRITE|windows.DELETE, windows.FILE_SHARE_READ, sa, windows.CREATE_ALWAYS, windows.FILE_ATTRIBUTE_NORMAL, 0)
+	handle, err := windows.CreateFile(tmpDestination16, windows.GENERIC_WRITE|windows.DELETE, windows.FILE_SHARE_READ, nil, windows.CREATE_ALWAYS, windows.FILE_ATTRIBUTE_NORMAL, 0)
 	if err != nil {
 		return err
 	}
@@ -63,6 +52,10 @@ func writeLockedDownFile(destination string, overwrite bool, contents []byte) er
 	if n != len(contents) {
 		deleteIt()
 		return windows.ERROR_IO_INCOMPLETE
+	}
+	if err = windows.FlushFileBuffers(handle); err != nil {
+		deleteIt()
+		return err
 	}
 	fileRenameInfo := &struct {
 		replaceIfExists byte

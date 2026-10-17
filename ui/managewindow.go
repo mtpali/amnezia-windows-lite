@@ -15,6 +15,7 @@ type ManageTunnelsWindow struct {
 	walk.FormBase
 	tunnelsPage     *TunnelsPage
 	tunnelChangedCB *manager.TunnelChangeCallback
+	anchoring       bool
 }
 
 const (
@@ -42,8 +43,8 @@ func NewManageTunnelsWindow() (*ManageTunnelsWindow, error) {
 			mtw.Dispose()
 		}
 	}()
-	mtw.SetName("WindowsLite")
-	mtw.SetTitle("Windows Lite")
+	mtw.SetName("amnezia")
+	mtw.SetTitle("amnezia")
 	font, err := walk.NewFont("Segoe UI", 9, 0)
 	if err != nil {
 		return nil, err
@@ -95,6 +96,7 @@ func NewManageTunnelsWindow() (*ManageTunnelsWindow, error) {
 		})
 	})
 	applyOLED(mtw)
+	mtw.Starting().Attach(func() { mtw.placeBottomRight(false) })
 	ok = true
 	return mtw, nil
 }
@@ -113,32 +115,15 @@ func (mtw *ManageTunnelsWindow) WndProc(hwnd win.HWND, msg uint32, wParam, lPara
 		if mtw.tunnelsPage != nil {
 			mtw.tunnelsPage.listView.SelectFirstActiveTunnel()
 		}
+		mtw.ShowAtBottomRight()
 		raise(hwnd)
 		return 0
+	case win.WM_DPICHANGED, win.WM_DISPLAYCHANGE, win.WM_SETTINGCHANGE:
+		result := mtw.FormBase.WndProc(hwnd, msg, wParam, lParam)
+		if mtw.Visible() && !mtw.anchoring && (msg != win.WM_SETTINGCHANGE || wParam == 0x002F /* SPI_SETWORKAREA */) {
+			mtw.placeBottomRight(false)
+		}
+		return result
 	}
 	return mtw.FormBase.WndProc(hwnd, msg, wParam, lParam)
-}
-func (mtw *ManageTunnelsWindow) showLog() {
-	dlg, err := walk.NewDialog(mtw)
-	if showError(err, mtw) {
-		return
-	}
-	defer dlg.Dispose()
-	dlg.SetTitle("Log")
-	dlg.SetIcon(mtw.Icon())
-	dlg.SetLayout(walk.NewVBoxLayout())
-	dlg.SetSize(walk.Size{640, 340})
-	dlg.SetMinMaxSize(walk.Size{460, 260}, walk.Size{})
-	page, err := NewLogPage()
-	if showError(err, mtw) {
-		return
-	}
-	if err = page.SetParent(dlg); showError(err, mtw) {
-		page.Dispose()
-		return
-	}
-	page.SetVisible(true)
-	applyOLED(dlg)
-	dlg.Starting().Attach(page.scrollToBottom)
-	dlg.Run()
 }

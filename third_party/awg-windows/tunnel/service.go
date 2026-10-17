@@ -6,12 +6,9 @@
 package tunnel
 
 import (
-	"bytes"
-	"fmt"
 	"log"
 	"net"
 	"os"
-	"runtime"
 	"time"
 
 	"github.com/amnezia-vpn/amneziawg-go/v3/conn"
@@ -24,9 +21,7 @@ import (
 
 	"github.com/amnezia-vpn/amneziawg-windows/v3/conf"
 	"github.com/amnezia-vpn/amneziawg-windows/v3/elevate"
-	"github.com/amnezia-vpn/amneziawg-windows/v3/ringlogger"
 	"github.com/amnezia-vpn/amneziawg-windows/v3/services"
-	"github.com/amnezia-vpn/amneziawg-windows/v3/version"
 )
 
 type tunnelService struct {
@@ -59,22 +54,6 @@ func (service *tunnelService) Execute(args []string, r <-chan svc.ChangeRequest,
 				select {
 				case <-t.C:
 					t.Stop()
-					buf := make([]byte, 1024)
-					for {
-						n := runtime.Stack(buf, true)
-						if n < len(buf) {
-							buf = buf[:n]
-							break
-						}
-						buf = make([]byte, 2*len(buf))
-					}
-					lines := bytes.Split(buf, []byte{'\n'})
-					log.Println("Failed to shutdown after 30 seconds. Probably dead locked. Printing stack and killing.")
-					for _, line := range lines {
-						if len(bytes.TrimSpace(line)) > 0 {
-							log.Println(string(line))
-						}
-					}
 					os.Exit(777)
 					return
 				case <-stopIt:
@@ -103,12 +82,6 @@ func (service *tunnelService) Execute(args []string, r <-chan svc.ChangeRequest,
 		log.Println("Shutting down")
 	}()
 
-	err = ringlogger.InitGlobalLogger("TUN")
-	if err != nil {
-		serviceError = services.ErrorRingloggerOpen
-		return
-	}
-
 	config, err = conf.LoadFromPath(service.Path)
 	if err != nil {
 		serviceError = services.ErrorLoadConfiguration
@@ -120,10 +93,6 @@ func (service *tunnelService) Execute(args []string, r <-chan svc.ChangeRequest,
 		serviceError = services.ErrorLoadConfiguration
 		return
 	}
-
-	log.SetPrefix(fmt.Sprintf("[%s] ", config.Name))
-
-	log.Println("Starting", version.UserAgent())
 
 	if m, err := mgr.Connect(); err == nil {
 		if lockStatus, err := m.LockStatus(); err == nil && lockStatus.IsLocked {
@@ -197,7 +166,7 @@ func (service *tunnelService) Execute(args []string, r <-chan svc.ChangeRequest,
 
 	log.Println("Creating interface instance")
 	bind := conn.NewDefaultBind()
-	dev = device.NewDevice(wintun, bind, &device.Logger{log.Printf, log.Printf})
+	dev = device.NewDevice(wintun, bind, device.NewLogger(device.LogLevelSilent, ""))
 
 	log.Println("Setting interface configuration")
 	uapi, err = ipc.UAPIListen(config.Name)

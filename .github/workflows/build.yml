@@ -27,7 +27,7 @@ jobs:
         with:
           name: windows-lite-${{ matrix.arch }}
           path: |
-            dist/amnezia-windows-lite-${{ matrix.arch }}.zip
+            dist/amnezia-${{ matrix.arch }}.zip
             dist/SHA256-${{ matrix.arch }}.txt
           retention-days: 30
   release:
@@ -52,5 +52,5 @@ jobs:
           if gh release view "$BUILD_TAG" >/dev/null 2>&1; then
             gh release upload "$BUILD_TAG" release/* --clobber
           else
-            gh release create "$BUILD_TAG" release/* --target "$BUILD_SHA" --title "Windows Lite $BUILD_TAG" --notes-file PORTABLE.txt
+            gh release create "$BUILD_TAG" release/* --target "$BUILD_SHA" --title "amnezia $BUILD_TAG" --notes-file PORTABLE.txt
           fi

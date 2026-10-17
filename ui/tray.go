@@ -53,7 +53,7 @@ func NewTray(mtw *ManageTunnelsWindow) (*Tray, error) {
 func (tray *Tray) setup() error {
 	tray.clicked = tray.onManageTunnels
 
-	tray.SetToolTip("Windows Lite")
+	tray.SetToolTip("amnezia")
 	tray.SetVisible(true)
 	if icon, err := loadLogoIcon(16); err == nil {
 		tray.SetIcon(icon)
@@ -258,7 +258,7 @@ func (tray *Tray) onTunnelChange(tunnel *manager.Tunnel, state, globalState mana
 
 			}
 		} else if !tray.mtw.Visible() {
-			tray.ShowError(l18n.Sprintf("Windows Lite Tunnel Error"), err.Error())
+			tray.ShowError(l18n.Sprintf("amnezia Tunnel Error"), err.Error())
 		}
 		tray.setTunnelState(tunnel, state)
 	})
@@ -272,7 +272,7 @@ func (tray *Tray) updateGlobalState(globalState manager.TunnelState) {
 	actions := tray.ContextMenu().Actions()
 	statusAction := actions.At(0)
 
-	tray.SetToolTip(l18n.Sprintf("Windows Lite: %s", textForState(globalState, true)))
+	tray.SetToolTip(l18n.Sprintf("amnezia: %s", textForState(globalState, true)))
 	stateText := textForState(globalState, false)
 	stateIcon, err := iconForState(globalState, 16)
 	if err == nil {
@@ -326,6 +326,7 @@ func (tray *Tray) setTunnelState(tunnel *manager.Tunnel, state manager.TunnelSta
 
 func (tray *Tray) onManageTunnels() {
 	tray.mtw.tunnelsPage.listView.SelectFirstActiveTunnel()
+	tray.mtw.ShowAtBottomRight()
 	raise(tray.mtw.Handle())
 }
 

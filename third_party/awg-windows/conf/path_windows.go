@@ -39,6 +39,7 @@ func tunnelConfigurationsDirectory() (string, error) {
 // uses what's passed to it. This isn't used by amneziawg-windows, but is useful for external
 // consumers of our libraries who might want to do strange things.
 func PresetRootDirectory(root string) {
+	cachedConfigFileDir = ""
 	cachedRootDir = root
 }
 

@@ -1,4 +1,4 @@
-Windows Lite uses the following projects. Original source headers and notices are retained.
+amnezia uses the following projects. Original source headers and notices are retained.
 Client: https://github.com/amnezia-vpn/amneziawg-windows-client (MIT)
 Windows engine: https://github.com/amnezia-vpn/amneziawg-windows (MIT headers)
 

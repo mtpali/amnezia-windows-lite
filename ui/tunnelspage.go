@@ -124,11 +124,6 @@ func (tp *TunnelsPage) CreateToolbar() error {
 		admin bool
 	}{
 		{"Import", tp.onImport, true}, {"Edit", tp.onEditTunnel, true}, {"Export", tp.onExportTunnels, true},
-		{"Log", func() {
-			if w, ok := tp.Form().(*ManageTunnelsWindow); ok {
-				w.showLog()
-			}
-		}, false},
 	} {
 		button, err := walk.NewPushButton(bar)
 		if err != nil {

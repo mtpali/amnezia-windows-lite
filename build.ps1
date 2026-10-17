@@ -24,7 +24,7 @@ $env:CGO_ENABLED = '0'
 $env:GOOS = 'windows'
 $env:GOARCH = 'amd64'
 if ($RunTests) {
-    & $go run github.com/akavel/rsrc@v0.10.2 -arch amd64 -manifest manifest.xml -ico 'ui/icon/lite.ico,ui/icon/dot.ico' -o resources_windows_amd64.syso
+    & $go run github.com/akavel/rsrc@v0.10.2 -arch amd64 -manifest manifest.xml -ico 'ui/icon/amnezia.ico,ui/icon/dot.ico' -o resources_windows_amd64.syso
     if ($LASTEXITCODE -ne 0) { throw 'Test resource generation failed' }
     $env:LITE_UI_SMOKE = '1'
     $env:LITE_SCREENSHOT_DIR = Join-Path $PSScriptRoot 'dist/ui'
@@ -41,12 +41,12 @@ if ($RunTests) {
         Remove-Item ui/resources_windows_amd64.syso -ErrorAction SilentlyContinue
     }
 }
-& $go run github.com/akavel/rsrc@v0.10.2 -arch $Arch -manifest manifest.xml -ico 'ui/icon/lite.ico,ui/icon/dot.ico' -o "resources_windows_$Arch.syso"
+& $go run github.com/akavel/rsrc@v0.10.2 -arch $Arch -manifest manifest.xml -ico 'ui/icon/amnezia.ico,ui/icon/dot.ico' -o "resources_windows_$Arch.syso"
 if ($LASTEXITCODE -ne 0) { throw 'Resource generation failed' }
 $env:GOARCH = $Arch
-$output = Join-Path $PSScriptRoot "dist/windows-lite-$Arch"
+$output = Join-Path $PSScriptRoot "dist/amnezia-$Arch"
 New-Item -ItemType Directory -Path $output -Force | Out-Null
-& $go build -ldflags='-H windowsgui -s -w' -trimpath -buildvcs=false -o "$output/WindowsLite.exe" .
+& $go build -ldflags='-H windowsgui -s -w' -trimpath -buildvcs=false -o "$output/amnezia.exe" .
 if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
 $wintunZip = Join-Path $tools 'wintun.zip'
 if (!(Test-Path $wintunZip)) { Invoke-WebRequest 'https://www.wintun.net/builds/wintun-0.14.1.zip' -OutFile $wintunZip }
@@ -55,9 +55,9 @@ Expand-Archive $wintunZip -DestinationPath $tools -Force
 $wintunArch = if ($Arch -eq '386') { 'x86' } else { $Arch }
 Copy-Item "$tools/wintun/bin/$wintunArch/wintun.dll" $output
 Copy-Item COPYING,PORTABLE.txt,THIRD-PARTY-NOTICES.txt $output
-$zip = Join-Path $PSScriptRoot "dist/amnezia-windows-lite-$Arch.zip"
-$files = @('WindowsLite.exe','wintun.dll','COPYING','PORTABLE.txt','THIRD-PARTY-NOTICES.txt') | ForEach-Object { Join-Path $output $_ }
+$zip = Join-Path $PSScriptRoot "dist/amnezia-$Arch.zip"
+$files = @('amnezia.exe','wintun.dll','COPYING','PORTABLE.txt','THIRD-PARTY-NOTICES.txt') | ForEach-Object { Join-Path $output $_ }
 Compress-Archive -Path $files -DestinationPath $zip -Force
 $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
-"$hash  amnezia-windows-lite-$Arch.zip" | Set-Content "dist/SHA256-$Arch.txt" -Encoding ascii
+"$hash  amnezia-$Arch.zip" | Set-Content "dist/SHA256-$Arch.txt" -Encoding ascii
 Write-Host "Built $zip"
