@@ -13,6 +13,7 @@ Download the ZIP for your architecture from [Releases](https://github.com/mtpali
 - Legacy DPAPI files are converted on the original Windows installation, with conflicts preserved.
 - No Log screen, log export, shared log mappings, or persistent log files.
 - Bottom-right placement above the taskbar at startup and when reopened from the tray.
+- Live download/upload counters and handshake time, refreshed while the window is visible.
 - Reduced, visibility-aware polling.
 
 ## Build
@@ -28,6 +29,8 @@ From Windows 10/11 x64 PowerShell:
 `build.bat` invokes the same script. The script downloads and verifies Go 1.25.14 and Wintun 0.14.1. Resource generation uses pinned `github.com/akavel/rsrc@v0.10.2`. No C compiler or Visual Studio is needed. ZIPs and SHA256 hashes are written to `dist/`. GitHub Actions builds x64 and ARM64 and publishes the downloads.
 
 For an upgrade, use Exit in the old tray menu before replacing files. Keep the existing Data and State folders in the same location; they remain compatible. Internal service and registry names stay stable to avoid duplicate services. Legacy .conf.dpapi files are converted to readable .conf files on the original Windows installation before moving the folder to another computer. Private keys are readable in .conf files. Data retains its existing Windows directory permissions, so editing stored files may require administrator access.
+
+The runtime pipe test uses the administrator-protected namespace; run PowerShell as Administrator when using -RunTests.
 
 Only targeted, deterministic tests are run. Inherited upstream integration tests are not run indiscriminately because some require a live system, large downloads, or never terminate.
 

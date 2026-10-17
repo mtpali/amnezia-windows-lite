@@ -13,7 +13,6 @@ import (
 
 	"github.com/amnezia-vpn/amneziawg-go/v3/conn"
 	"github.com/amnezia-vpn/amneziawg-go/v3/device"
-	"github.com/amnezia-vpn/amneziawg-go/v3/ipc"
 	"github.com/amnezia-vpn/amneziawg-go/v3/tun"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
@@ -169,7 +168,7 @@ func (service *tunnelService) Execute(args []string, r <-chan svc.ChangeRequest,
 	dev = device.NewDevice(wintun, bind, device.NewLogger(device.LogLevelSilent, ""))
 
 	log.Println("Setting interface configuration")
-	uapi, err = ipc.UAPIListen(config.Name)
+	uapi, err = ListenUAPI(config.Name)
 	if err != nil {
 		serviceError = services.ErrorUAPIListen
 		return
@@ -190,7 +189,7 @@ func (service *tunnelService) Execute(args []string, r <-chan svc.ChangeRequest,
 		for {
 			conn, err := uapi.Accept()
 			if err != nil {
-				continue
+				return
 			}
 			go dev.IpcHandle(conn)
 		}

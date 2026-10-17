@@ -101,6 +101,10 @@ func (cv *ConfView) SetTunnel(t *manager.Tunnel) {
 	if t == nil {
 		cv.tunnel = nil
 		cv.title.SetText("")
+		cv.status.SetText("")
+		cv.endpoint.SetText("")
+		cv.traffic.SetText("")
+		cv.handshake.SetText("")
 		cv.connect.SetEnabled(false)
 		return
 	}
@@ -125,8 +129,13 @@ func (cv *ConfView) refresh() {
 		state, err := t.State()
 		global, _ := manager.IPCClientGlobalState()
 		cfg, cfgErr := t.StoredConfig()
+		trafficAvailable := state != manager.TunnelStarted
 		if state == manager.TunnelStarted {
-			cfg, cfgErr = t.RuntimeConfig()
+			live, liveErr := t.RuntimeConfig()
+			if liveErr == nil {
+				cfg, cfgErr = live, nil
+				trafficAvailable = true
+			}
 		}
 		cv.Synchronize(func() {
 			cv.busy = false
@@ -148,20 +157,28 @@ func (cv *ConfView) refresh() {
 				cv.connect.SetText(textForState(state, true))
 			}
 			cv.connect.SetEnabled(global == manager.TunnelStarted || global == manager.TunnelStopped)
+			cv.endpoint.SetText("")
+			cv.handshake.SetText("")
 			if cfgErr == nil && len(cfg.Peers) > 0 {
 				cv.endpoint.SetText(cfg.Peers[0].Endpoint.String())
+			}
+			if !trafficAvailable {
+				cv.traffic.SetText("↓ —   ↑ —")
+			} else if cfgErr == nil {
 				var rx, tx uint64
 				for _, p := range cfg.Peers {
 					rx += uint64(p.RxBytes)
 					tx += uint64(p.TxBytes)
 				}
 				cv.traffic.SetText(fmt.Sprintf("↓ %s   ↑ %s", formatBytes(rx), formatBytes(tx)))
-				hs := cfg.Peers[0].LastHandshakeTime
-				if !hs.IsEmpty() {
-					cv.handshake.SetText(hs.String())
-				} else {
-					cv.handshake.SetText("")
+				if len(cfg.Peers) > 0 {
+					hs := cfg.Peers[0].LastHandshakeTime
+					if !hs.IsEmpty() {
+						cv.handshake.SetText(hs.String())
+					}
 				}
+			} else {
+				cv.traffic.SetText("")
 			}
 		})
 	}()

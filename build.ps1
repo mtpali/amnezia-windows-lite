@@ -32,6 +32,8 @@ if ($RunTests) {
     if ($LASTEXITCODE -ne 0) { throw 'Preference tests failed' }
     & $go test . -run '^TestLite' -count=1
     if ($LASTEXITCODE -ne 0) { throw 'Configuration policy tests failed' }
+    & $go test ./manager -run '^TestLite' -count=1 -timeout 30s
+    if ($LASTEXITCODE -ne 0) { throw 'Runtime traffic pipe tests failed' }
     # UI package tests are a separate executable and need their own v6 common-controls manifest.
     Copy-Item resources_windows_amd64.syso ui/resources_windows_amd64.syso
     try {

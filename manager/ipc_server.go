@@ -77,6 +77,7 @@ func (s *ManagerService) RuntimeConfig(tunnelName string) (*conf.Config, error) 
 	conf, err := conf.FromUAPI(pipe, storedConfig)
 	pipe.Unlock()
 	if err != nil {
+		disconnectTunnelServicePipe(tunnelName)
 		return nil, err
 	}
 	if s.elevatedToken == 0 {

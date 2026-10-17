@@ -39,23 +39,26 @@ func connectTunnelServicePipe(tunnelName string) (*connectedTunnel, error) {
 		pipe.Lock()
 		return pipe, nil
 	}
-	pipePath, err := services.PipePathOfTunnel(tunnelName)
-	if err != nil {
-		return nil, err
-	}
 	localSystem, err := windows.CreateWellKnownSid(windows.WinLocalSystemSid)
 	if err != nil {
 		return nil, err
 	}
 	pipe = &connectedTunnel{}
-	config := &namedpipe.DialConfig{ExpectedOwner: localSystem}
-	pipe.Conn, err = config.DialTimeout(pipePath, 0)
+	pipe.Conn, err = dialTunnelServicePipe(tunnelName, localSystem)
 	if err != nil {
 		return nil, err
 	}
 	connectedTunnelServicePipes[tunnelName] = pipe
 	pipe.Lock()
 	return pipe, nil
+}
+
+func dialTunnelServicePipe(tunnelName string, expectedOwner *windows.SID) (net.Conn, error) {
+	pipePath, err := services.PipePathOfTunnel(tunnelName)
+	if err != nil {
+		return nil, err
+	}
+	return (&namedpipe.DialConfig{ExpectedOwner: expectedOwner}).DialTimeout(pipePath, 0)
 }
 
 func disconnectTunnelServicePipe(tunnelName string) {
