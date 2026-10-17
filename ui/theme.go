@@ -11,27 +11,29 @@ import (
 )
 
 var (
-	oledBlack      = walk.RGB(0, 0, 0)
-	oledText       = walk.RGB(232, 232, 232)
-	oledMuted      = walk.RGB(155, 155, 155)
-	oledAccent     = walk.RGB(115, 245, 178)
-	oledSelection  = walk.RGB(25, 25, 25)
-	oledBrush      *walk.SolidColorBrush
-	oledOnce       sync.Once
-	oledControls   = make(map[win.HWND]bool)
-	oledSubclass   uintptr
-	themeDLL       = windows.NewLazySystemDLL("uxtheme.dll")
-	setWindowTheme = themeDLL.NewProc("SetWindowTheme")
-	dwmAttribute   = windows.NewLazySystemDLL("dwmapi.dll").NewProc("DwmSetWindowAttribute")
-	comctl         = windows.NewLazySystemDLL("comctl32.dll")
-	setSubclass    = comctl.NewProc("SetWindowSubclass")
-	removeSubclass = comctl.NewProc("RemoveWindowSubclass")
-	defSubclass    = comctl.NewProc("DefSubclassProc")
+	oledBlack         = walk.RGB(0, 0, 0)
+	oledText          = walk.RGB(232, 232, 232)
+	oledMuted         = walk.RGB(155, 155, 155)
+	oledAccent        = walk.RGB(115, 245, 178)
+	oledSelection     = walk.RGB(25, 25, 25)
+	oledBrush         *walk.SolidColorBrush
+	oledOnce          sync.Once
+	oledControls      = make(map[win.HWND]bool)
+	oledSubclass      uintptr
+	oledTableSubclass uintptr
+	themeDLL          = windows.NewLazySystemDLL("uxtheme.dll")
+	setWindowTheme    = themeDLL.NewProc("SetWindowTheme")
+	dwmAttribute      = windows.NewLazySystemDLL("dwmapi.dll").NewProc("DwmSetWindowAttribute")
+	comctl            = windows.NewLazySystemDLL("comctl32.dll")
+	setSubclass       = comctl.NewProc("SetWindowSubclass")
+	removeSubclass    = comctl.NewProc("RemoveWindowSubclass")
+	defSubclass       = comctl.NewProc("DefSubclassProc")
 )
 
 func initOLED() {
 	oledOnce.Do(func() {
 		oledSubclass = syscall.NewCallback(oledControlProc)
+		oledTableSubclass = syscall.NewCallback(oledTableProc)
 		oledBrush, _ = walk.NewSolidColorBrush(oledBlack)
 		// ForceDark for native menus and common dialogs, available since 1903.
 		if windows.RtlGetVersion().BuildNumber >= 18362 {
@@ -53,7 +55,11 @@ func applyOLED(w walk.Window) {
 	}
 	initOLED()
 	if oledBrush != nil {
-		w.AsWindowBase().SetBackground(oledBrush)
+		if form, ok := w.(walk.Form); ok {
+			form.AsFormBase().SetBackground(oledBrush)
+		} else {
+			w.AsWindowBase().SetBackground(oledBrush)
+		}
 	}
 	hwnd := w.Handle()
 	if _, ok := w.(walk.Form); ok {
@@ -84,9 +90,11 @@ func applyOLED(w walk.Window) {
 		oledControls[hwnd] = true
 		setSubclass.Call(uintptr(hwnd), oledSubclass, 1, 0)
 	case *walk.TableView:
-		win.SendMessage(hwnd, win.LVM_SETBKCOLOR, 0, uintptr(oledBlack))
-		win.SendMessage(hwnd, win.LVM_SETTEXTBKCOLOR, 0, uintptr(oledBlack))
-		win.SendMessage(hwnd, win.LVM_SETTEXTCOLOR, 0, uintptr(oledText))
+		setSubclass.Call(uintptr(hwnd), oledTableSubclass, 2, 0)
+		for child := win.GetWindow(hwnd, win.GW_CHILD); child != 0; child = win.GetWindow(child, win.GW_HWNDNEXT) {
+			setWindowTheme.Call(uintptr(child), uintptr(unsafe.Pointer(theme)), 0)
+		}
+		applyNativeTableColors(hwnd)
 	}
 	if container, ok := w.(walk.Container); ok {
 		for i := 0; i < container.Children().Len(); i++ {
@@ -185,3 +193,31 @@ func drawOLEDText(dc win.HDC, text *uint16, n int32, rect *win.RECT, flags uint3
 }
 
 var fillRectProc = windows.NewLazySystemDLL("user32.dll").NewProc("FillRect")
+
+// Walk's TableView owns native list-view children. Styling only its outer HWND
+// leaves the empty area in the system's light color.
+func applyNativeTableColors(hwnd win.HWND) {
+	for child := win.GetWindow(hwnd, win.GW_CHILD); child != 0; child = win.GetWindow(child, win.GW_HWNDNEXT) {
+		var name [64]uint16
+		if _, err := win.GetClassName(child, &name[0], len(name)); err != nil {
+			continue
+		}
+		if windows.UTF16ToString(name[:]) != "SysListView32" {
+			continue
+		}
+		win.SendMessage(child, win.LVM_SETBKCOLOR, 0, uintptr(oledBlack))
+		win.SendMessage(child, win.LVM_SETTEXTBKCOLOR, 0, uintptr(oledBlack))
+		win.SendMessage(child, win.LVM_SETTEXTCOLOR, 0, uintptr(oledText))
+		win.InvalidateRect(child, nil, true)
+	}
+}
+func oledTableProc(hwnd win.HWND, msg uint32, wParam, lParam, id, data uintptr) uintptr {
+	result, _, _ := defSubclass.Call(uintptr(hwnd), uintptr(msg), wParam, lParam)
+	if msg == win.WM_THEMECHANGED || msg == win.WM_SETTINGCHANGE {
+		applyNativeTableColors(hwnd)
+	}
+	if msg == win.WM_NCDESTROY {
+		removeSubclass.Call(uintptr(hwnd), oledTableSubclass, id)
+	}
+	return result
+}

@@ -110,7 +110,7 @@ func TestLiteWindowStarts(t *testing.T) {
 						}
 					}
 				}
-				if total == 0 || black*100 < total*65 {
+				if total == 0 || black*100 < total*85 {
 					t.Errorf("OLED background is not predominantly black: %d/%d", black, total)
 				}
 				buttonBounds := window.tunnelsPage.confView.connect.BoundsPixels()

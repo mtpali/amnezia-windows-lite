@@ -51,6 +51,7 @@ func NewLogPage() (*LogPage, error) {
 	lp.logView.SetAlternatingRowBG(false)
 	lp.logView.SetCellStyler(oledCellStyler{})
 	lp.logView.SetLastColumnStretched(true)
+	lp.logView.SetHeaderHidden(true)
 	lp.logView.SetGridlines(false)
 
 	contextMenu, err := walk.NewMenu()
